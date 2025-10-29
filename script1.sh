@@ -1,4 +1,7 @@
-aws ec2 create-vpc --cidr-block 192.168.0.0/24 \
+# CREO VPC Y DEVUELVO SU ID
+
+VPC_ID=$(aws ec2 create-vpc --cidr-block 192.168.0.0/24 \
     --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=MyVpc}]' \
-     --query Vpc.VpcId --output text 
+     --query Vpc.VpcId --output text) 
+
    
