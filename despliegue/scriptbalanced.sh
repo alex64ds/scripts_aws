@@ -9,7 +9,7 @@ GS_ID=$(aws ec2 create-security-group \
       --query GroupId \
       --output text )
 
-echo "Se ha creado el grupo de seguridad cuyo id es $GS_ID"
+echo $GS_ID
 
 # Autorizo los servicios SSH y web al grupo de seguridad
 
@@ -17,13 +17,13 @@ aws ec2 authorize-security-group-ingress \
     --group-id $GS_ID \
     --protocol tcp \
     --port 22 \
-    --cidr 0.0.0.0/0
+    --cidr 0.0.0.0/0 > /dev/null
 
 aws ec2 authorize-security-group-ingress \
     --group-id $GS_ID \
     --protocol tcp \
     --port 80 \
-    --cidr 0.0.0.0/0
+    --cidr 0.0.0.0/0 > /dev/null
 
 
 # CReo el target group
@@ -33,8 +33,8 @@ TG_ARN=$(aws elbv2 create-target-group \
     --protocol HTTP \
     --port 80 \
     --target-type instance \
-    --query TargetGroups.
-    --vpc-id vpc-050e504cff33ea6c7)
+    --vpc-id vpc-050e504cff33ea6c7 \
+    --query "TargetGroups[].TargetGroupArn" --output text)
 
 echo $TG_ARN
 
@@ -44,13 +44,19 @@ aws elbv2 register-targets \
 
 # Creo el balanceador 
 
-# aws elb create-load-balancer \
-#      --load-balancer-name balanceador-cli \
-#      --listeners "Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80" \
-#      --subnets subnet-0c709c7ea670a67a8 --security-groups $GS_ID
+LB_ARN=$(aws elbv2 create-load-balancer \
+    --name balanceador-cli \
+    --type application \
+    --subnets subnet-0c709c7ea670a67a8 subnet-05f39c5ec006769ab \
+    --security-groups $GS_ID \
+    --query LoadBalancers[].LoadBalancerArn \
+    --output text )
 
-# aws elbv2 create-listener \
-#     --load-balancer-arn $TG_ARN \
-#     --protocol HTTP \
-#     --port 80 \
-#     --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
+echo $LB_ARN
+
+
+aws elbv2 create-listener \
+    --load-balancer-arn $LB_ARN \
+    --protocol HTTP \
+    --port 80 \
+    --default-actions Type=forward,TargetGroupArn=$TG_ARN > /dev/null
