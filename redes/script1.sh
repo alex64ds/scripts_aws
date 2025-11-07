@@ -44,7 +44,7 @@ echo "se ha creado un nuevo grupo de seguridad | ID -> $SG_ID"
 
 aws ec2 authorize-security-group-ingress \
     --group-id $SG_ID \
-    --ip-permissions '[{"IpProtocol": "tcp","FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "AllowIp"}]}]' > /dev/null
+    --ip-permissions '[{"IpProtocol": "tcp","FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "Allow_SSH"}]}]' > /dev/null
 
 echo "Se ha habilitado el puerto 22 a $SG_ID"
 

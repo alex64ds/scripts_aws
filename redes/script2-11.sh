@@ -1,10 +1,19 @@
-# CREO VPC Y ALMACENO EN UNA VARIABLE EN UNA ID
+#!/bin/bash
 
-VPC_ID=$(aws ec2 create-vpc --cidr-block 192.168.1.0/24 \
+# CREO VPC 
+
+VPC_ID=$(aws ec2 create-vpc --cidr-block 172.16.0.0/16 \
     --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=NUBEALEX}]' \
      --query Vpc.VpcId --output text) 
 
-# muestro ID de la VPC
+
+# Creo gateway
+
+GW_ID=$(aws ec2 create-internet-gateway \
+     --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=igw-alex}]' \
+      --query InternetGateway.InternetGatewayId \
+      --output text)
+
 
 echo "se ha lanzado una nueva VPC | ID -> $VPC_ID"
 
@@ -18,7 +27,7 @@ aws ec2 modify-vpc-attribute \
 
 SUB_ID=$(aws ec2 create-subnet \
     --vpc-id $VPC_ID \
-    --cidr-block 192.168.1.0/28 \
+    --cidr-block 172.16.0.0/20 \
     --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=mi_subred1_alex}]' \
     --query Subnet.SubnetId --output text)
 
@@ -28,13 +37,9 @@ echo "se ha lanzado una nueva subred para $VPC_ID que es $SUB_ID"
 
 aws ec2 modify-subnet-attribute --subnet-id $SUB_ID --map-public-ip-on-launch
 
-# Creo grupo de seguridad 
+# Creo el gateway para que las 2 subredes se puedan ver
 
-SG_ID=$(aws ec2 create-security-group $VPC_ID \
-    --group-name gsalex \
-    --description "Mi grupo de seguridad para abrir el puerto 22" \
-    --vpc-id $VPC_ID \
-    --query GroupId --output text)
+exit 0
 
-
-echo "se ha creado un nuevo grupo de seguridad | ID -> $SG_ID"
+aws ec2 create-internet-gateway \
+    --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=igw-alex}]'
