@@ -6,6 +6,7 @@ VPC_ID=$(aws ec2 create-vpc --cidr-block 172.16.0.0/16 \
     --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=NUBEALEX}]' \
      --query Vpc.VpcId --output text) 
 
+echo "se ha lanzado una nueva VPC | ID -> $VPC_ID"
 
 # Creo gateway
 
@@ -15,7 +16,7 @@ GW_ID=$(aws ec2 create-internet-gateway \
       --output text)
 
 
-echo "se ha lanzado una nueva VPC | ID -> $VPC_ID"
+echo "se ha creado un nuevo gateway | ID -> $GW_ID"
 
 # HABILITO DNS en LA VPC
 
@@ -39,7 +40,7 @@ aws ec2 modify-subnet-attribute --subnet-id $SUB_ID --map-public-ip-on-launch
 
 # Creo el gateway para que las 2 subredes se puedan ver
 
-exit 0
+aws ec2 attach-internet-gateway \
+    --internet-gateway-id $GW_ID \
+    --vpc-id $VPC_ID
 
-aws ec2 create-internet-gateway \
-    --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=igw-alex}]'
