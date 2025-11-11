@@ -24,5 +24,6 @@ else
         echo "La instancia $1 se ha detenido"
         
     fi
+    
 
 fi

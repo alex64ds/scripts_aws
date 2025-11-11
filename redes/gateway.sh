@@ -1,4 +1,7 @@
-aws ec2 create-internet-gateway \
-     --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=igw-alex}]' \
-      --query InternetGateway.InternetGatewayId \
-      --output text
+
+
+# Asocio la tabla de rutas a la subred
+
+aws ec2 associate-route-table \
+    --route-table-id $RTB_ID \
+    --subnet-id $GW_ID
