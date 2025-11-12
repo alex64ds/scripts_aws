@@ -65,12 +65,23 @@ aws ec2 associate-route-table \
     --route-table-id $RTB_ID \
     --subnet-id $SUB_ID
 
+# Creo grupo de seguridad y le doy permisos
+
+SG_ID=$(aws ec2 create-security-group \
+    --group-name gsalex \
+    --description "Mi grupo de seguridad para abrir el puerto 22" \
+    --vpc-id $VPC_ID \
+    --query GroupId \
+    --output text)
+    
+echo "se ha creado un nuevo grupo de seguridad | ID -> $SG_ID"
 
 aws ec2 authorize-security-group-ingress \
     --group-id $SG_ID \
     --ip-permissions '[{"IpProtocol": "tcp","FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "Allow_SSH"}]}]' > /dev/null
 
 echo "Se ha habilitado el puerto 22 a $SG_ID"
+
 
 # Creo EC2
 
