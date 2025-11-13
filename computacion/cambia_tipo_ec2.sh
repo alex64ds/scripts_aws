@@ -25,5 +25,16 @@ else
         
     fi
     
+    aws ec2 modify-instance-attribute \
+        --instance-id $1 \
+        --instance-type "{\"Value\": \"$2\"}"
+    echo "Se ha cambiado el tipo de instancia a $2"
+    aws ec2 start-instances \
+        --instance-ids $1 > /dev/null
+    echo "Arrancando la instancia $1"
+    aws ec2 wait instance-running \
+        --instance-ids $1
+    echo "Se ha arrancado la instancia $1 ahora con el tipo $2"
+
 
 fi

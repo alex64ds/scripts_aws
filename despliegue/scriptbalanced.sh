@@ -42,7 +42,7 @@ aws elbv2 register-targets \
     --target-group-arn $TG_ARN \
     --targets Id=i-0d7bd2c755b92c6db Id=i-0fd49a8f345979f4c
 
-# Creo el balanceador 
+# Creo el balanceador
 
 LB_ARN=$(aws elbv2 create-load-balancer \
     --name balanceador-cli \
