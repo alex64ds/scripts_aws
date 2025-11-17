@@ -21,9 +21,11 @@ for VPC_ID in $VPC_IDS; do
                 --filters "Name=subnet-id,Values=subnet-0be259b7524fba0fa" \
                 --query Reservations[].Instances[].InstanceId \
                 --output text | tr '\t' '\n' > instancias
-            while read line; do
+            # while read line; do
 
-            done < instancias
+
+
+            # done < instancias
         fi
         # aws ec2 delete-subnet --subnet-id $SUBNET_ID
         # echo " Subnet $SUBNET_ID eliminada."
