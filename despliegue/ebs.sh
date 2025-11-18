@@ -1,17 +1,14 @@
 #!/bin/bash
 
-if [ $# -ne 2 ]; then
+echo "Que desea hacer?"
 
-    echo "Uso: $0 <ruta> <crear|version>"
+echo "1) Crear un nuevo entorno"
 
-else
+echo "2) Actualizar el entorno"
 
+read cv
 
-    if [ -f $1 ]; then
-
-        if [[ "$1" = *.zip ]]; then
-
-                if [ $2 = "crear" ]; then
+if [ $cv -eq 1 ]; then
                     comps3g=$()
                     aws s3api create-bucket \
                         --bucket amzn-s3-entorno-green \
@@ -33,6 +30,15 @@ else
                             --cname-prefix alex-app-cli \
                             --version-label v1 \
                             --solution-stack-name "64bit Amazon Linux 2023 v4.7.8 running PHP 8.4"
+
+    
+
+else
+
+
+    if [ -f $1 ]; then
+
+        if [[ "$1" = *.zip ]]; then
 
 
 
