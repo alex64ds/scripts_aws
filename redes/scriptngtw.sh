@@ -50,7 +50,7 @@ echo "SE HA CREADO $SUBPUB_ID Y $SUBPRIV_ID"
 
 aws ec2 modify-subnet-attribute --subnet-id $SUBPUB_ID --map-public-ip-on-launch
 
-# Creo dos tablas de rutas para la vpc tanto publica
+# Creo la tabla de rutas para la subred publica
 
 RTBPUB_ID=$(aws ec2 create-route-table --vpc-id $VPC_ID \
     --tag-specifications 'ResourceType=route-table,Tags=[{Key=Name,Value=rtb-alex-pub}]' \
@@ -130,3 +130,45 @@ aws ec2 wait instance-running \
 
 echo "se ha lanzado una nueva instancia EC2 | ID -> $EC2PRIV_ID"
 
+# Creamos la IP elastica
+
+ELS_IP=$(aws ec2 allocate-address \
+    --query AllocationId \
+     --output text)
+
+echo "Nueva ip Elastica | ID -> $ELS_IP"
+
+# Y ahora el nat gateway
+
+NGW_ID=$(aws ec2 create-nat-gateway \
+    --subnet-id subnet-028c4f48e96cc6d09 \
+    --allocation-id eipalloc-052b4b9137138c331 \
+    --query  NatGateway.NatGatewayId \
+    --output text)
+
+echo "Se ha creado un NAT gateway | ID -> $NGW_ID"
+
+aws ec2 wait nat-gateway-available \
+    --nat-gateway-ids $NGW_ID
+
+
+# Creo la tabla de rutas para la subred privada
+
+RTBPRIV_ID=$(aws ec2 create-route-table --vpc-id $VPC_ID \
+    --tag-specifications 'ResourceType=route-table,Tags=[{Key=Name,Value=rtb-alex-priv}]' \
+    --query RouteTable.RouteTableId --output text)
+
+echo "se ha creado una nueva tabla de rutas | ID -> $RTBPRIV_ID"
+
+# Añado la ruta a la tabla de rutas
+
+aws ec2 create-route --route-table-id $RTBPRIV_ID \
+    --destination-cidr-block 0.0.0.0/0 \
+    --gateway-id $GW_ID
+
+
+# Asocio la tabla de rutas a la subred
+
+aws ec2 associate-route-table \
+    --route-table-id $RTBPUB_ID \
+    --nat-gateway-id $NGW_ID
