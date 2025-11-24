@@ -71,7 +71,19 @@ if [ $cv -eq 1 ]; then
 
 elif [ $cv -eq 2 ]; then
 
-    echo "Comandos blue"
+    compenv=$(aws elasticbeanstalk describe-environments \
+        --application-name "alex-app-cli" \
+        --output text | wc -l)
+
+    if [ $compenv -ne 0 ]; then
+
+        echo "Existe el entorno"
+
+    else
+
+        echo "El entorno no existe, por favor, hagalo"
+    
+    fi
 
 else
 
