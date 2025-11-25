@@ -112,6 +112,19 @@ elif [ $cv -eq 2 ]; then
 
         fi
     done
+
+        aws elasticbeanstalk create-application-version \
+        --application-name alex-app-cli \
+        --version-label v2 \
+        --description "Entorno Blue" \
+        --source-bundle S3Bucket="amzn-s3-entorno-blue-acp",S3Key="blue.zip" \
+        --auto-create-application
+
+        aws elasticbeanstalk update-environment \
+            --environment-name alex-env-cli \
+            --version-label v2
+
+
         
 
     else
