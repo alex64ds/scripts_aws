@@ -14,10 +14,8 @@ if [ $cv -eq 1 ]; then
 
     while [ $compsb3g -eq 0 ]; do
 
-        read -p "Que desea ponerla detras de entorno green del bucket: " ng
-
         aws s3api create-bucket \
-            --bucket amzn-s3-entorno-green-$ng \
+            --bucket amzn-s3-entorno-green-acp \
             --region us-east-1
 
         compsb3g=$(aws s3 ls | grep amzn-s3-entorno-green | wc -l)
@@ -41,12 +39,12 @@ if [ $cv -eq 1 ]; then
 
             else
 
-                echo "El fichero $1 no es un .zip"
+                echo "El fichero $zip no es un .zip"
             fi        
 
         else
 
-            echo "El fichero $1 no existe"
+            echo "El fichero $zip no existe"
 
         fi
     done
@@ -76,8 +74,45 @@ elif [ $cv -eq 2 ]; then
         --output text | wc -l)
 
     if [ $compenv -ne 0 ]; then
+        compsb3b=$(aws s3 ls | grep amzn-s3-entorno-blue | wc -l)    
 
-        echo "Existe el entorno"
+        while [ $compsb3b -eq 0 ]; do
+
+        aws s3api create-bucket \
+            --bucket amzn-s3-entorno-blue-acp \
+            --region us-east-1
+
+        compsb3b=$(aws s3 ls | grep amzn-s3-entorno-blue | wc -l)
+
+    done
+
+    compszip3b=$(aws s3 ls amzn-s3-entorno-blue-acp | grep .zip$ | wc -l)
+
+
+    while [ $compszip3b -eq 0 ]; do
+
+        read -p "Zip que se subira al bucket -> " zip
+
+
+        if [ -f $zip ]; then
+
+            if [[ "$zip" = *.zip ]]; then
+
+                aws s3 cp $zip s3://amzn-s3-entorno-blue-acp/blue.zip
+                compszip3b=$(aws s3 ls amzn-s3-entorno-blue-acp | grep .zip$ | wc -l)
+
+            else
+
+                echo "El fichero $zip no es un .zip"
+            fi        
+
+        else
+
+            echo "El fichero $zip no existe"
+
+        fi
+    done
+        
 
     else
 
