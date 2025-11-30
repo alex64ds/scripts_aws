@@ -141,9 +141,9 @@ echo "Nueva ip Elastica | ID -> $ELS_IP"
 # Y ahora el nat gateway
 
 NGW_ID=$(aws ec2 create-nat-gateway \
-    --subnet-id subnet-028c4f48e96cc6d09 \
-    --allocation-id eipalloc-052b4b9137138c331 \
-    --query  NatGateway.NatGatewayId \
+    --subnet-id $SUBPUB_ID \
+    --allocation-id $ELS_IP \
+    --query NatGateway.NatGatewayId \
     --output text)
 
 echo "Se ha creado un NAT gateway | ID -> $NGW_ID"
@@ -164,11 +164,11 @@ echo "se ha creado una nueva tabla de rutas | ID -> $RTBPRIV_ID"
 
 aws ec2 create-route --route-table-id $RTBPRIV_ID \
     --destination-cidr-block 0.0.0.0/0 \
-    --gateway-id $GW_ID
+    --nat-gateway-id $NGW_ID
 
 
 # Asocio la tabla de rutas a la subred
 
 aws ec2 associate-route-table \
-    --route-table-id $RTBPUB_ID \
-    --nat-gateway-id $NGW_ID
+    --route-table-id $RTBPRIV_ID \
+    --subnet-id $SUBPRIV_ID
