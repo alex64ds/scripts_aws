@@ -4,7 +4,7 @@ def crear_vpc():
     ec2 = boto3.client('ec2')
 
     # Crear la VPC
-    vpc = ec2.create_vpc(CidrBlock='192.168.5.0/16')
+    vpc = ec2.create_vpc(CidrBlock='192.168.0.0/16')
     vpc_id = vpc['Vpc']['VpcId']
     print(f'VPC creada con ID: {vpc_id}')
 
@@ -62,6 +62,47 @@ def crear_igw_y_asociar(vpc_id):
 
     return gw_id
 
+def crear_subredes(vpc_id):
+    ec2 = boto3.client('ec2')
+
+    # Crear subred pública
+    subred_pub = ec2.create_subnet(
+        VpcId=vpc_id,
+        CidrBlock='192.168.0.0/24',
+        TagSpecifications=[
+            {
+                'ResourceType': 'subnet',
+                'Tags': [{'Key': 'Name', 'Value': 'mi_subredpub_alex_boto'}]
+            }
+        ]
+    )
+    subpub_id = subred_pub['Subnet']['SubnetId']
+    print(f"Subred pública creada: {subpub_id}")
+
+    # Crear subred privada
+    subred_priv = ec2.create_subnet(
+        VpcId=vpc_id,
+        CidrBlock='192.168.128.0/24',
+        TagSpecifications=[
+            {
+                'ResourceType': 'subnet',
+                'Tags': [{'Key': 'Name', 'Value': 'mi_subredpriv_alex_boto'}]
+            }
+        ]
+    )
+    subpriv_id = subred_priv['Subnet']['SubnetId']
+    print(f"Subred privada creada: {subpriv_id}")
+
+    # Habilitar IP pública automática en la subred pública
+    ec2.modify_subnet_attribute(
+        SubnetId=subpub_id,
+        MapPublicIpOnLaunch={'Value': True}
+    )
+    print("Asignación automática de IP pública habilitada en la subred pública")
+
+    return subpub_id, subpriv_id
+
+
 
 if __name__ == "__main__":
     vpc_id = crear_vpc()
@@ -70,5 +111,6 @@ if __name__ == "__main__":
     igw_id = crear_igw_y_asociar(vpc_id)
     print(f"IGW creado y asociado correctamente: {igw_id}")
 
+    subpub, subpriv = crear_subredes(vpc_id)
 
-
+    print(f"SE HAN CREADO: Subred pública={subpub} | Subred privada={subpriv}")
