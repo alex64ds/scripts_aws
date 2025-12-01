@@ -102,6 +102,41 @@ def crear_subredes(vpc_id):
 
     return subpub_id, subpriv_id
 
+def crear_rtb_publica(vpc_id, igw_id, subpub_id):
+    ec2 = boto3.client('ec2')
+
+    # Crear la tabla de rutas pública
+    rtb = ec2.create_route_table(
+        VpcId=vpc_id,
+        TagSpecifications=[
+            {
+                'ResourceType': 'route-table',
+                'Tags': [{'Key': 'Name', 'Value': 'rtb-alex-pub-boto'}]
+            }
+        ]
+    )
+
+    rtbpub_id = rtb['RouteTable']['RouteTableId']
+    print(f"Tabla de rutas pública creada | ID -> {rtbpub_id}")
+
+    # Añadir ruta 0.0.0.0/0 hacia el IGW
+    ec2.create_route(
+        RouteTableId=rtbpub_id,
+        DestinationCidrBlock='0.0.0.0/0',
+        GatewayId=igw_id
+    )
+    print("Ruta 0.0.0.0/0 añadida hacia el Internet Gateway")
+
+    # Asociar la tabla de rutas a la subred pública
+    ec2.associate_route_table(
+        RouteTableId=rtbpub_id,
+        SubnetId=subpub_id
+    )
+    print(f"Tabla de rutas asociada a la subred pública {subpub_id}")
+
+    return rtbpub_id
+
+
 
 
 if __name__ == "__main__":
@@ -114,3 +149,6 @@ if __name__ == "__main__":
     subpub, subpriv = crear_subredes(vpc_id)
 
     print(f"SE HAN CREADO: Subred pública={subpub} | Subred privada={subpriv}")
+
+    rtbpub_id = crear_rtb_publica(vpc_id, igw_id, subpub)
+    print(f"RTB pública creada correctamente: {rtbpub_id}")
