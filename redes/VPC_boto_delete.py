@@ -3,6 +3,27 @@ import time
 
 ec2 = boto3.client('ec2')
 
+def eliminar_nat_gateways(vpc_id):
+    print("Buscando NAT Gateways…")
+    nat_gws = ec2.describe_nat_gateways(
+        Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}]
+    )['NatGateways']
+
+    for nat in nat_gws:
+        nat_id = nat['NatGatewayId']
+        allocation_id = nat['NatGatewayAddresses'][0]['AllocationId']
+        print(f"Eliminando NAT Gateway {nat_id}")
+        ec2.delete_nat_gateway(NatGatewayId=nat_id)
+
+        # Esperar a que se elimine
+        waiter = ec2.get_waiter('nat_gateway_deleted')
+        waiter.wait(NatGatewayIds=[nat_id])
+        print(f"NAT Gateway {nat_id} eliminado")
+
+        # Liberar IP Elastica
+        print(f"IP Elastica {allocation_id} liberada")
+        ec2.release_address(AllocationId=allocation_id)
+
 
 def eliminar_instancias(vpc_id):
     print("Buscando instancias…")
@@ -118,6 +139,7 @@ def eliminar_vpc(vpc_id):
 if __name__ == "__main__":
     vpc_id = input("Introduce el ID de la VPC a eliminar: ")
 
+    eliminar_nat_gateways(vpc_id)   
     eliminar_instancias(vpc_id)
     eliminar_sg(vpc_id)
     eliminar_route_tables(vpc_id)

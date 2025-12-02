@@ -150,7 +150,8 @@ def crear_security_group(vpc_id):
     sg_id = response['GroupId']
     print(f"Security Group creado | ID -> {sg_id}")
 
-    # Regla de entrada: SSH (22/tcp)
+    # Añadimos regla de engtrada del SSH y ping (ICMP)
+
     ec2.authorize_security_group_ingress(
         GroupId=sg_id,
         IpPermissions=[
@@ -166,7 +167,6 @@ def crear_security_group(vpc_id):
     )
     print("Regla SSH añadida al SG")
 
-    # Regla de entrada: ICMP (ping)
     ec2.authorize_security_group_ingress(
         GroupId=sg_id,
         IpPermissions=[
@@ -188,7 +188,7 @@ def lanzar_instancias(subpub_id, subpriv_id, sg_id):
     ec2 = boto3.client('ec2')
     waiter = ec2.get_waiter('instance_running')
 
-    # Instancia pública: usamos network interface para asegurar public IP
+    # Lanzamos Instancia pública (usamos network interface para asegurar una ip publica)
     resp_pub = ec2.run_instances(
         ImageId="ami-0360c520857e3138f",
         InstanceType="t3.micro",
@@ -209,11 +209,11 @@ def lanzar_instancias(subpub_id, subpriv_id, sg_id):
     ec2_pub_id = resp_pub['Instances'][0]['InstanceId']
     print("Instancia pública empezando a lanzarse")
 
-    # Esperar running
+    # Esperar al lanzamiento completo
     waiter.wait(InstanceIds=[ec2_pub_id])
     print(f"Lanzada instancia pública: {ec2_pub_id}")
 
-    # Instancia privada: no public IP asociada
+    # Lanzamos instancia privada
     resp_priv = ec2.run_instances(
         ImageId="ami-0360c520857e3138f",
         InstanceType="t3.micro",
@@ -237,7 +237,29 @@ def lanzar_instancias(subpub_id, subpriv_id, sg_id):
     return ec2_pub_id, ec2_priv_id
 
 
+def crear_nat_gateway(subpub_id):
+    ec2 = boto3.client('ec2')
+    # Crear IP Elastica
+    eip_response = ec2.allocate_address(Domain='vpc')
+    allocation_id = eip_response['AllocationId']
+    public_ip = eip_response['PublicIp']
+    print(f"IP elastica creada | ID -> {allocation_id} | IP -> {public_ip}")
 
+    # Crear NAT Gateway
+    nat_response = ec2.create_nat_gateway(
+        SubnetId=subpub_id,
+        AllocationId=allocation_id
+    )
+    nat_gateway_id = nat_response['NatGateway']['NatGatewayId']
+    print(f"NAT Gateway creado | ID -> {nat_gateway_id}")
+
+    # Esperar a que esté disponible
+    waiter = ec2.get_waiter('nat_gateway_available')
+    print("Esperando a que el NAT Gateway esté disponible...")
+    waiter.wait(NatGatewayIds=[nat_gateway_id])
+    print(f"NAT Gateway {nat_gateway_id} ya está disponible")
+
+    return nat_gateway_id, allocation_id, public_ip
 
 
 if __name__ == "__main__":
@@ -247,4 +269,5 @@ if __name__ == "__main__":
     rtbpub_id = crear_rtb_publica(vpc_id, igw_id, subpub)
     sg_id = crear_security_group(vpc_id)
     ec2_pub_id, ec2_priv_id = lanzar_instancias(subpub, subpriv, sg_id)
+    nat_gateway_id, allocation_id, public_ip = crear_nat_gateway(subpub)
     print("Proceso de CREACION COMPLETADO.")
