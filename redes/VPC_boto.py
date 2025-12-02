@@ -1,4 +1,5 @@
 import boto3
+import time
 
 def crear_vpc():
     ec2 = boto3.client('ec2')
@@ -183,23 +184,67 @@ def crear_security_group(vpc_id):
 
     return sg_id
 
+def lanzar_instancias(subpub_id, subpriv_id, sg_id):
+    ec2 = boto3.client('ec2')
+    waiter = ec2.get_waiter('instance_running')
+
+    # Instancia pública: usamos network interface para asegurar public IP
+    resp_pub = ec2.run_instances(
+        ImageId="ami-0360c520857e3138f",
+        InstanceType="t3.micro",
+        KeyName="vockey",
+        MinCount=1,
+        MaxCount=1,
+        TagSpecifications=[{
+            'ResourceType': 'instance',
+            'Tags': [{'Key': 'Name', 'Value': 'MiEC2publicoBOTO'}]
+        }],
+        NetworkInterfaces=[{
+            'AssociatePublicIpAddress': True,
+            'DeviceIndex': 0,
+            'SubnetId': subpub_id,
+            'Groups': [sg_id]
+        }]
+    )
+    ec2_pub_id = resp_pub['Instances'][0]['InstanceId']
+    print("Instancia pública empezando a lanzarse")
+
+    # Esperar running
+    waiter.wait(InstanceIds=[ec2_pub_id])
+    print(f"Lanzada instancia pública: {ec2_pub_id}")
+
+    # Instancia privada: no public IP asociada
+    resp_priv = ec2.run_instances(
+        ImageId="ami-0360c520857e3138f",
+        InstanceType="t3.micro",
+        KeyName="vockey",
+        MinCount=1,
+        MaxCount=1,
+        SubnetId=subpriv_id,
+        SecurityGroupIds=[sg_id],
+        TagSpecifications=[{
+            'ResourceType': 'instance',
+            'Tags': [{'Key': 'Name', 'Value': 'MiEC2privadoBOTOs'}]
+        }]
+    )
+    ec2_priv_id = resp_priv['Instances'][0]['InstanceId']
+    print("Instancia privada empezando a lanzarse")
+    
+
+    waiter.wait(InstanceIds=[ec2_priv_id])
+    print(f"Lanzada instancia privada: {ec2_priv_id}")
+
+    return ec2_pub_id, ec2_priv_id
+
+
 
 
 
 if __name__ == "__main__":
     vpc_id = crear_vpc()
-    print(f'PROCESO COMPLETADO. VPC ID: {vpc_id}')
-
     igw_id = crear_igw_y_asociar(vpc_id)
-    print(f"IGW creado y asociado correctamente: {igw_id}")
-
     subpub, subpriv = crear_subredes(vpc_id)
-
-    print(f"SE HAN CREADO: Subred pública={subpub} | Subred privada={subpriv}")
-
     rtbpub_id = crear_rtb_publica(vpc_id, igw_id, subpub)
-    print(f"RTB pública creada correctamente: {rtbpub_id}")
-
-
     sg_id = crear_security_group(vpc_id)
-    print(f"Security Group creado correctamente: {sg_id}")
+    ec2_pub_id, ec2_priv_id = lanzar_instancias(subpub, subpriv, sg_id)
+    print("Proceso de CREACION COMPLETADO.")
