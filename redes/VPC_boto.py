@@ -136,6 +136,53 @@ def crear_rtb_publica(vpc_id, igw_id, subpub_id):
 
     return rtbpub_id
 
+def crear_security_group(vpc_id):
+    ec2 = boto3.client('ec2')
+
+    # Crear el Security Group
+    response = ec2.create_security_group(
+        GroupName='gs-ntgw',
+        Description='Grupo de seguridad para ssh y ping',
+        VpcId=vpc_id
+    )
+
+    sg_id = response['GroupId']
+    print(f"Security Group creado | ID -> {sg_id}")
+
+    # Regla de entrada: SSH (22/tcp)
+    ec2.authorize_security_group_ingress(
+        GroupId=sg_id,
+        IpPermissions=[
+            {
+                'IpProtocol': 'tcp',
+                'FromPort': 22,
+                'ToPort': 22,
+                'IpRanges': [
+                    {'CidrIp': '0.0.0.0/0', 'Description': 'Allow_SSH'}
+                ]
+            }
+        ]
+    )
+    print("Regla SSH añadida al SG")
+
+    # Regla de entrada: ICMP (ping)
+    ec2.authorize_security_group_ingress(
+        GroupId=sg_id,
+        IpPermissions=[
+            {
+                'IpProtocol': 'icmp',
+                'FromPort': -1,
+                'ToPort': -1,
+                'IpRanges': [
+                    {'CidrIp': '0.0.0.0/0', 'Description': 'Allow_All_ICMP'}
+                ]
+            }
+        ]
+    )
+    print("Regla ICMP añadida al SG")
+
+    return sg_id
+
 
 
 
@@ -152,3 +199,7 @@ if __name__ == "__main__":
 
     rtbpub_id = crear_rtb_publica(vpc_id, igw_id, subpub)
     print(f"RTB pública creada correctamente: {rtbpub_id}")
+
+
+    sg_id = crear_security_group(vpc_id)
+    print(f"Security Group creado correctamente: {sg_id}")
