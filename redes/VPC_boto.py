@@ -261,6 +261,39 @@ def crear_nat_gateway(subpub_id):
 
     return nat_gateway_id, allocation_id, public_ip
 
+def crear_rtb_privada(vpc_id, subpriv_id, nat_gateway_id):
+    ec2 = boto3.client('ec2')
+
+    # Crear la tabla de rutas privada
+    rtb = ec2.create_route_table(
+        VpcId=vpc_id,
+        TagSpecifications=[
+            {
+                'ResourceType': 'route-table',
+                'Tags': [{'Key': 'Name', 'Value': 'rtb-alex-priv-boto'}]
+            }
+        ]
+    )
+    rtbpriv_id = rtb['RouteTable']['RouteTableId']
+    print(f"Tabla de rutas privada creada | ID -> {rtbpriv_id}")
+
+    # Añadir ruta 0.0.0.0/0 hacia el NAT Gateway
+    ec2.create_route(
+        RouteTableId=rtbpriv_id,
+        DestinationCidrBlock='0.0.0.0/0',
+        NatGatewayId=nat_gateway_id
+    )
+    print("Ruta 0.0.0.0/0 añadida hacia el NAT Gateway")
+
+    # Asociar la tabla de rutas a la subred privada
+    ec2.associate_route_table(
+        RouteTableId=rtbpriv_id,
+        SubnetId=subpriv_id
+    )
+    print(f"Tabla de rutas asociada a la subred privada {subpriv_id}")
+
+    return rtbpriv_id
+
 
 if __name__ == "__main__":
     vpc_id = crear_vpc()
@@ -270,4 +303,5 @@ if __name__ == "__main__":
     sg_id = crear_security_group(vpc_id)
     ec2_pub_id, ec2_priv_id = lanzar_instancias(subpub, subpriv, sg_id)
     nat_gateway_id, allocation_id, public_ip = crear_nat_gateway(subpub)
+    rtbpriv_id = crear_rtb_privada(vpc_id, subpriv, nat_gateway_id)
     print("Proceso de CREACION COMPLETADO.")
