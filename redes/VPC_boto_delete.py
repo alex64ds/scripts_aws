@@ -76,7 +76,6 @@ def eliminar_route_tables(vpc_id):
             continue
 
         rt_id = rt['RouteTableId']
-        print(f"Eliminando tabla")
 
         # Eliminar rutas distintas de la local
         for route in rt['Routes']:
