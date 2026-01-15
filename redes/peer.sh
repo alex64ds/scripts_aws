@@ -1,7 +1,7 @@
 # Creamos una VPC para cada region
 
 VPC_IDvir=$(aws ec2 create-vpc --cidr-block 192.168.0.0/20 \
-    --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=NUBEALEXore},{Key=entorno,Value=prueba}]' \
+    --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=NUBEALEXvir},{Key=entorno,Value=prueba}]' \
      --query Vpc.VpcId --output text) 
 
 echo "se ha lanzado una nueva VPC | ID -> $VPC_IDvir"
@@ -146,3 +146,60 @@ echo "Se ha habilitado el puerto 22 a $SGore_ID"
 aws ec2 authorize-security-group-ingress \
     --group-id $SGore_ID --region us-west-2 \
     --ip-permissions '[{"IpProtocol": "icmp","FromPort": -1,"ToPort": -1,"IpRanges": [{"CidrIp": "0.0.0.0/0","Description": "Allow_All_ICMP"}]}]' > /dev/null
+
+# creo EC2
+
+
+EC2_ID1=$(aws ec2 run-instances \
+    --image-id ami-0360c520857e3138f \
+    --instance-type t3.micro \
+    --key-name vockey \
+    --subnet-id $SUB1_ID \
+    --security-group-ids $SGvir_ID \
+    --associate-public-ip-address \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=MiEC2publico1}]' \
+    --query Instances[].InstanceId --output text)
+
+
+echo "se ha lanzado una nueva instancia EC2 | ID -> $EC2_ID1"
+
+EC2_ID2=$(aws ec2 run-instances \
+    --image-id ami-00f46ccd1cbfb363e \
+    --instance-type t3.micro \
+    --region us-west-2 \
+    --subnet-id $SUB2_ID \
+    --security-group-ids $SGore_ID \
+    --associate-public-ip-address \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=MiEC2publico1}]' \
+    --query Instances[].InstanceId --output text)
+
+
+echo "se ha lanzado una nueva instancia EC2 | ID -> $EC2_ID2"
+
+# Creamos el Peer connection y lo aceptamos
+
+PCON_ID=$(aws ec2 create-vpc-peering-connection \
+  --vpc-id $VPC_IDvir \
+  --peer-vpc-id $VPC_IDore \
+  --peer-region us-west-2 \
+  --query 'VpcPeeringConnection.VpcPeeringConnectionId' \
+  --output text)
+
+aws ec2 wait vpc-peering-connection-exists \
+  --vpc-peering-connection-ids $PCCON_ID
+
+echo "Se ha creado un nuevo Peer Connection | ID -> $PCON_ID"
+
+aws ec2 accept-vpc-peering-connection --vpc-peering-connection-id $PCON_ID --region us-west-2 > /dev/null
+
+
+
+# Asociamos el peer connection a las VPC
+
+aws ec2 create-route --route-table-id $RTBPUB_ID1 \
+    --destination-cidr-block 10.0.0.0/20  \
+    --vpc-peering-connection-id $PCON_ID > /dev/null
+
+aws ec2 create-route --route-table-id $RTBPUB_ID2 \
+    --destination-cidr-block 192.168.0.0/20 \
+    --vpc-peering-connection-id $PCON_ID --region us-west-2 > /dev/null

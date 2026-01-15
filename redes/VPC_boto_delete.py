@@ -3,6 +3,73 @@ import time
 
 ec2 = boto3.client('ec2')
 
+def eliminar_vpc_peering(vpc_id):
+    print("Buscando conexiones VPC Peering…")
+
+    peerings = ec2.describe_vpc_peering_connections(
+        Filters=[
+            {
+                'Name': 'requester-vpc-info.vpc-id',
+                'Values': [vpc_id]
+            },
+            {
+                'Name': 'status-code',
+                'Values': ['active', 'pending-acceptance', 'provisioning']
+            }
+        ]
+    )['VpcPeeringConnections']
+
+    peerings += ec2.describe_vpc_peering_connections(
+        Filters=[
+            {
+                'Name': 'accepter-vpc-info.vpc-id',
+                'Values': [vpc_id]
+            },
+            {
+                'Name': 'status-code',
+                'Values': ['active', 'pending-acceptance', 'provisioning']
+            }
+        ]
+    )['VpcPeeringConnections']
+
+    if not peerings:
+        print("No hay VPC Peering para eliminar")
+        return
+
+    for peering in peerings:
+        peering_id = peering['VpcPeeringConnectionId']
+        print(f"VPC Peering encontrado: {peering_id}")
+
+        # Eliminar rutas asociadas
+        print("Eliminando rutas asociadas al VPC Peering…")
+
+        route_tables = ec2.describe_route_tables(
+            Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}]
+        )['RouteTables']
+
+        for rt in route_tables:
+            rt_id = rt['RouteTableId']
+            for route in rt.get('Routes', []):
+                if route.get('VpcPeeringConnectionId') == peering_id:
+                    try:
+                        ec2.delete_route(
+                            RouteTableId=rt_id,
+                            DestinationCidrBlock=route['DestinationCidrBlock']
+                        )
+                        print(f"Ruta hacia {route['DestinationCidrBlock']} eliminada en {rt_id}")
+                    except Exception as e:
+                        print(f"No se pudo eliminar una ruta: {e}")
+
+        # Eliminar el peering
+        print(f"Eliminando VPC Peering {peering_id}")
+        ec2.delete_vpc_peering_connection(VpcPeeringConnectionId=peering_id)
+
+        # Esperar a que se elimine
+        waiter = ec2.get_waiter('vpc_peering_connection_deleted')
+        waiter.wait(VpcPeeringConnectionIds=[peering_id])
+        print(f"VPC Peering {peering_id} eliminado correctamente")
+
+
 def eliminar_nat_gateways(vpc_id):
     print("Buscando NAT Gateways…")
     nat_gws = ec2.describe_nat_gateways(
@@ -137,7 +204,7 @@ def eliminar_vpc(vpc_id):
 
 if __name__ == "__main__":
     vpc_id = input("Introduce el ID de la VPC a eliminar: ")
-
+    eliminar_vpc_peering(vpc_id)
     eliminar_nat_gateways(vpc_id)   
     eliminar_instancias(vpc_id)
     eliminar_sg(vpc_id)
