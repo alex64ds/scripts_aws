@@ -157,7 +157,7 @@ EC2_ID1=$(aws ec2 run-instances \
     --subnet-id $SUB1_ID \
     --security-group-ids $SGvir_ID \
     --associate-public-ip-address \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=MiEC2publico1}]' \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=MiEC2publicovir}]' \
     --query Instances[].InstanceId --output text)
 
 
@@ -170,7 +170,7 @@ EC2_ID2=$(aws ec2 run-instances \
     --subnet-id $SUB2_ID \
     --security-group-ids $SGore_ID \
     --associate-public-ip-address \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=MiEC2publico1}]' \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=MiEC2publicoore}]' \
     --query Instances[].InstanceId --output text)
 
 
@@ -186,7 +186,7 @@ PCON_ID=$(aws ec2 create-vpc-peering-connection \
   --output text)
 
 aws ec2 wait vpc-peering-connection-exists \
-  --vpc-peering-connection-ids $PCCON_ID
+  --vpc-peering-connection-ids $PCON_ID
 
 echo "Se ha creado un nuevo Peer Connection | ID -> $PCON_ID"
 
