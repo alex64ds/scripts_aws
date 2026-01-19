@@ -496,3 +496,55 @@ aws ec2 create-route --route-table-id $RTBPUBore_ID1 \
 aws ec2 create-route --route-table-id $RTBPUBore_ID2 \
     --destination-cidr-block 192.168.0.0/16 \
     --transit-gateway-id $TGore --region us-west-2 > /dev/null
+
+# Creamos un transit gateway de tipo peer connection
+
+ATTpeer_ID=$(aws ec2 create-transit-gateway-peering-attachment \
+  --transit-gateway-id $TGvir \
+  --peer-transit-gateway-id $TGore \
+  --peer-account-id 433934801640 \
+  --peer-region us-west-2 \
+  --query 'TransitGatewayPeeringAttachment.TransitGatewayAttachmentId' \
+  --output text)
+
+echo "Attachment del peer connection creado | ID -> $ATTpeer_ID"
+
+STATE=$(aws ec2 describe-transit-gateway-peering-attachments \
+    --transit-gateway-attachment-ids $ATTpeer_ID \
+    --query 'TransitGatewayPeeringAttachments[0].State' \
+    --output text)
+
+while [ "$STATE" != "pendingAcceptance" ]; do
+    STATE=$(aws ec2 describe-transit-gateway-peering-attachments \
+        --transit-gateway-attachment-ids $ATTpeer_ID \
+        --query 'TransitGatewayPeeringAttachments[0].State' \
+        --output text)
+done
+
+
+aws ec2 accept-transit-gateway-peering-attachment \
+  --transit-gateway-attachment-id $ATTpeer_ID \
+  --region us-west-2
+
+STATE=$(aws ec2 describe-transit-gateway-peering-attachments \
+    --transit-gateway-attachment-ids $ATTpeer_ID \
+    --query 'TransitGatewayPeeringAttachments[0].State' \
+    --output text)
+
+while [ "$STATE" != "available" ]; do
+    STATE=$(aws ec2 describe-transit-gateway-peering-attachments \
+        --transit-gateway-attachment-ids $ATTpeer_ID \
+        --query 'TransitGatewayPeeringAttachments[0].State' \
+        --output text)
+done
+
+echo "$ATTpeer_ID ya disponible."
+
+RTB_ID=$(aws ec2 describe-transit-gateway-route-tables \
+    --filters Name=transit-gateway-id,Values=$TGW_ID \
+    --query 'TransitGatewayRouteTables[0].TransitGatewayRouteTableId' \
+    --output text)
+
+echo "La tabla de rutas del TGW es: $RTB_ID"
+
+
