@@ -121,7 +121,7 @@ def crear_security_group(vpc_id, region, nombre):
     print(f"[{region}] SG '{nombre}' creado: {sg}")
     return sg
 
-def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-07ff62358b87c7116"):
+def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-0b6c6ebed2801a5cb"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
@@ -137,7 +137,7 @@ def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-07ff62358b87c7116")
     waiter.wait(InstanceIds=[inst])
     return inst
 
-def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00a8151272c45cd8e"):
+def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-0786adace1541ca80"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
@@ -152,7 +152,7 @@ def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00a8151272c45cd8e")
     waiter.wait(InstanceIds=[inst])
     return inst
 
-def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-07ff62358b87c7116"):
+def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-0b6c6ebed2801a5cb"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
@@ -168,7 +168,7 @@ def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-07ff62358b87c
     waiter.wait(InstanceIds=[inst])
     return inst
 
-def lanzar_ec2_priv_ore(sub_id, sg_id, region, nombre, ami_id="ami-00a8151272c45cd8e"):
+def lanzar_ec2_priv_ore(sub_id, sg_id, region, nombre, ami_id="ami-0786adace1541ca80"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
