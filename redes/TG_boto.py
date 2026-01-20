@@ -1,5 +1,6 @@
 import boto3
 import time
+from botocore.exceptions import ClientError
 
 REGION_EAST = "us-east-1"
 REGION_WEST = "us-west-2"
@@ -124,7 +125,7 @@ def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3138f")
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
-        InstanceType="t3.micro",
+        InstanceType="t2.micro",
         KeyName="vockey",
         MinCount=1,
         MaxCount=1,
@@ -140,7 +141,7 @@ def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00f46ccd1cbfb363e")
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
-        InstanceType="t3.micro",
+        InstanceType="t2.micro",
         MinCount=1,
         MaxCount=1,
         NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':True}],
@@ -228,10 +229,6 @@ def crear_ruta_vpc_hacia_tgw(route_table_id, destination_cidr, tgw_id, region):
     )
     print(f"[{region}] Ruta {destination_cidr} -> TGW {tgw_id} añadida en {route_table_id}")
 
-
-import time
-import boto3
-from botocore.exceptions import ClientError
 
 def crear_peering(tgw_id_east, tgw_id_west):
     ec2_east = boto3.client('ec2', region_name=REGION_EAST)
@@ -341,22 +338,6 @@ if __name__ == "__main__":
     sub2_priv_east = crear_subred_privada(vpc2_east, REGION_EAST, '10.2.1.0/24', 'sub2_vir_priv')
     sub1_priv_west = crear_subred_privada(vpc1_west, REGION_WEST, '192.168.1.0/24', 'sub1_ore_priv')
     sub2_priv_west = crear_subred_privada(vpc2_west, REGION_WEST, '192.224.1.0/24', 'sub2_ore_priv')
-
-    # --- Nat Gateways ---
-    nat1_east = crear_nat_gateway(sub1_east, REGION_EAST, 'nat_vir1')
-    nat2_east = crear_nat_gateway(sub2_east, REGION_EAST, 'nat_vir2')
-    nat1_west = crear_nat_gateway(sub1_west, REGION_WEST, 'nat_ore1')
-    nat2_west = crear_nat_gateway(sub2_west, REGION_WEST, 'nat_ore2')
-
-    # --- Tablas de rutas Privadas ---
-
-    rtb_priv1_east = crear_route_table_privada(vpc1_east, REGION_EAST, nat1_east, sub1_priv_east, 'rtb_priv_vir1')
-
-    rtb_priv2_east = crear_route_table_privada(vpc2_east, REGION_EAST, nat2_east, sub2_priv_east, 'rtb_priv_vir2')
-
-    rtb_priv1_west = crear_route_table_privada(vpc1_west, REGION_WEST, nat1_west, sub1_priv_west, 'rtb_priv_ore1')
-
-    rtb_priv2_west = crear_route_table_privada(vpc2_west, REGION_WEST, nat2_west, sub2_priv_west, 'rtb_priv_ore2')
    
 
     # --- Tablas de rutas públicas ---
@@ -427,3 +408,18 @@ if __name__ == "__main__":
     crear_ruta_vpc_hacia_tgw(rtb2_west, '10.1.0.0/16', tgw_west, REGION_WEST)
     crear_ruta_vpc_hacia_tgw(rtb2_west, '10.2.0.0/16', tgw_west, REGION_WEST)
 
+    # --- Nat Gateways ---
+    nat1_east = crear_nat_gateway(sub1_east, REGION_EAST, 'nat_vir1')
+    nat2_east = crear_nat_gateway(sub2_east, REGION_EAST, 'nat_vir2')
+    nat1_west = crear_nat_gateway(sub1_west, REGION_WEST, 'nat_ore1')
+    nat2_west = crear_nat_gateway(sub2_west, REGION_WEST, 'nat_ore2')
+
+    # --- Tablas de rutas Privadas ---
+
+    rtb_priv1_east = crear_route_table_privada(vpc1_east, REGION_EAST, nat1_east, sub1_priv_east, 'rtb_priv_vir1')
+
+    rtb_priv2_east = crear_route_table_privada(vpc2_east, REGION_EAST, nat2_east, sub2_priv_east, 'rtb_priv_vir2')
+
+    rtb_priv1_west = crear_route_table_privada(vpc1_west, REGION_WEST, nat1_west, sub1_priv_west, 'rtb_priv_ore1')
+
+    rtb_priv2_west = crear_route_table_privada(vpc2_west, REGION_WEST, nat2_west, sub2_priv_west, 'rtb_priv_ore2')
