@@ -364,7 +364,7 @@ if __name__ == "__main__":
     lanzar_ec2_priv_vir(sub1_priv_east, sg1_eastpriv, REGION_EAST,'EC2_vir1priv')
     lanzar_ec2_priv_vir(sub2_priv_east, sg2_eastpriv, REGION_EAST,'EC2_vir2priv')
     lanzar_ec2_priv_ore(sub1_priv_west, sg1_westpriv, REGION_WEST,'EC2_ore1priv')
-    lanzar_ec2_priv_ores(sub2_priv_west, sg2_westpriv, REGION_WEST,'EC2_ore2priv')
+    lanzar_ec2_priv_ore(sub2_priv_west, sg2_westpriv, REGION_WEST,'EC2_ore2priv')
 
     # --- Transit Gateways ---
     tgw_east = crear_transit_gateway(REGION_EAST, 'TGW_East')
