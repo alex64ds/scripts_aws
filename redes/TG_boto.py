@@ -121,11 +121,11 @@ def crear_security_group(vpc_id, region, nombre):
     print(f"[{region}] SG '{nombre}' creado: {sg}")
     return sg
 
-def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3138f"):
+def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-07ff62358b87c7116"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
-        InstanceType="t2.micro",
+        InstanceType="t3.micro",
         KeyName="vockey",
         MinCount=1,
         MaxCount=1,
@@ -137,11 +137,11 @@ def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3138f")
     waiter.wait(InstanceIds=[inst])
     return inst
 
-def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00f46ccd1cbfb363e"):
+def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00a8151272c45cd8e"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
-        InstanceType="t2.micro",
+        InstanceType="t3.micro",
         MinCount=1,
         MaxCount=1,
         NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':True}],
@@ -152,7 +152,7 @@ def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00f46ccd1cbfb363e")
     waiter.wait(InstanceIds=[inst])
     return inst
 
-def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3138f"):
+def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-07ff62358b87c7116"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
@@ -168,7 +168,7 @@ def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3
     waiter.wait(InstanceIds=[inst])
     return inst
 
-def lanzar_ec2_priv_ore(sub_id, sg_id, region, nombre, ami_id="ami-00f46ccd1cbfb363e"):
+def lanzar_ec2_priv_ore(sub_id, sg_id, region, nombre, ami_id="ami-00a8151272c45cd8e"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
