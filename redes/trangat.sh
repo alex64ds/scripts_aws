@@ -524,7 +524,7 @@ done
 
 aws ec2 accept-transit-gateway-peering-attachment \
   --transit-gateway-attachment-id $ATTpeer_ID \
-  --region us-west-2
+  --region us-west-2 > /dev/null
 
 STATE=$(aws ec2 describe-transit-gateway-peering-attachments \
     --transit-gateway-attachment-ids $ATTpeer_ID \
@@ -540,11 +540,15 @@ done
 
 echo "$ATTpeer_ID ya disponible."
 
-RTB_ID=$(aws ec2 describe-transit-gateway-route-tables \
-    --filters Name=transit-gateway-id,Values=$TGW_ID \
+RTB_TGvir_ID=$(aws ec2 describe-transit-gateway-route-tables \
+    --filters Name=transit-gateway-id,Values=$TGvir \
     --query 'TransitGatewayRouteTables[0].TransitGatewayRouteTableId' \
     --output text)
 
-echo "La tabla de rutas del TGW es: $RTB_ID"
+RTB_TGore_ID=$(aws ec2 describe-transit-gateway-route-tables \
+    --filters Name=transit-gateway-id,Values=$TGore --region us-west-2 \
+    --query 'TransitGatewayRouteTables[0].TransitGatewayRouteTableId' \
+    --output text)
+
 
 

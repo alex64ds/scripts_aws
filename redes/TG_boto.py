@@ -56,12 +56,27 @@ def crear_security_group(vpc_id, region, nombre):
     print(f"[{region}] SG '{nombre}' creado: {sg}")
     return sg
 
-def lanzar_ec2(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3138f"):
+def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3138f"):
     ec2 = boto3.client('ec2', region_name=region)
     inst = ec2.run_instances(
         ImageId=ami_id,
         InstanceType="t3.micro",
         KeyName="vockey",
+        MinCount=1,
+        MaxCount=1,
+        NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':True}],
+        TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
+    )['Instances'][0]['InstanceId']
+    print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
+    waiter = ec2.get_waiter('instance_running')
+    waiter.wait(InstanceIds=[inst])
+    return inst
+
+def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00f46ccd1cbfb363e"):
+    ec2 = boto3.client('ec2', region_name=region)
+    inst = ec2.run_instances(
+        ImageId=ami_id,
+        InstanceType="t3.micro",
         MinCount=1,
         MaxCount=1,
         NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':True}],
@@ -109,27 +124,87 @@ def crear_vpc_attachment(tgw_id, vpc_id, sub_id, region):
     print(f"[{region}] VPC Attachment {att_id} disponible")
     return att_id
 
+def crear_ruta_vpc_hacia_tgw(route_table_id, destination_cidr, tgw_id, region):
+    ec2 = boto3.client('ec2', region_name=region)
+    ec2.create_route(
+        RouteTableId=route_table_id,
+        DestinationCidrBlock=destination_cidr,
+        TransitGatewayId=tgw_id
+    )
+    print(f"[{region}] Ruta {destination_cidr} -> TGW {tgw_id} añadida en {route_table_id}")
+
+
+import time
+import boto3
+from botocore.exceptions import ClientError
+
 def crear_peering(tgw_id_east, tgw_id_west):
-    ec2 = boto3.client('ec2', region_name=REGION_EAST)
-    peer_id = ec2.create_transit_gateway_peering_attachment(
+    ec2_east = boto3.client('ec2', region_name=REGION_EAST)
+    ec2_west = boto3.client('ec2', region_name=REGION_WEST)
+
+    response = ec2_east.create_transit_gateway_peering_attachment(
         TransitGatewayId=tgw_id_east,
         PeerTransitGatewayId=tgw_id_west,
         PeerRegion=REGION_WEST,
-        PeerAccountId="<TU_ACCOUNT_ID>"
-    )['TransitGatewayPeeringAttachment']['TransitGatewayAttachmentId']
+        PeerAccountId="433934801640"
+    )
+
+    peer_id = response['TransitGatewayPeeringAttachment']['TransitGatewayAttachmentId']
     print(f"Peering Attachment creado: {peer_id}")
 
-    # Aceptar en la región oeste
-    ec2_west = boto3.client('ec2', region_name=REGION_WEST)
-    ec2_west.accept_transit_gateway_peering_attachment(TransitGatewayAttachmentId=peer_id)
+    # Esperar pendingAcceptance EN EAST
+    while True:
+        time.sleep(1)
+        state = ec2_east.describe_transit_gateway_peering_attachments(
+            TransitGatewayAttachmentIds=[peer_id]
+        )['TransitGatewayPeeringAttachments'][0]['State']
 
-    # Esperar hasta 'available'
-    state = ""
-    while state != "available":
-        time.sleep(5)
-        state = ec2_west.describe_transit_gateway_peering_attachments(TransitGatewayAttachmentIds=[peer_id])['TransitGatewayPeeringAttachments'][0]['State']
-    print(f"Peering Attachment {peer_id} disponible")
+        print(f"EAST → {state}")
+        if state == "pendingAcceptance":
+            break
+
+    # Esperar a que el attachment exista EN WEST
+    print("Esperando aparición del attachment en WEST...")
+    while True:
+        time.sleep(1)
+        try:
+            response = ec2_west.describe_transit_gateway_peering_attachments(
+                TransitGatewayAttachmentIds=[peer_id]
+            )
+            state_west = response['TransitGatewayPeeringAttachments'][0]['State']
+            print(f"WEST -> {state_west}")
+            break
+        except ClientError as e:
+            if e.response['Error']['Code'] == "InvalidTransitGatewayAttachmentID.NotFound":
+                print("WEST -> aún no visible")
+                continue
+            else:
+                raise
+
+    # Aceptar EN WEST
+    ec2_west.accept_transit_gateway_peering_attachment(
+        TransitGatewayAttachmentId=peer_id
+    )
+    print("Peering aceptado en WEST")
+
+    # Esperar AVAILABLE EN EAST y WEST
+    def esperar_available(ec2, region):
+        while True:
+            time.sleep(1)
+            state = ec2.describe_transit_gateway_peering_attachments(
+                TransitGatewayAttachmentIds=[peer_id]
+            )['TransitGatewayPeeringAttachments'][0]['State']
+            print(f"{region} -> {state}")
+            if state == "available":
+                break
+
+    esperar_available(ec2_east, "EAST")
+    esperar_available(ec2_west, "WEST")
+
+    print(f"Peering Attachment {peer_id} disponible en ambas regiones")
     return peer_id
+
+
 
 def obtener_tgw_route_table(tgw_id, region):
     ec2 = boto3.client('ec2', region_name=region)
@@ -138,6 +213,16 @@ def obtener_tgw_route_table(tgw_id, region):
     )['TransitGatewayRouteTables'][0]['TransitGatewayRouteTableId']
     print(f"[{region}] TGW Route Table: {rtb_id}")
     return rtb_id
+
+def crear_ruta_tgw(rtb_id, destination_cidr, attachment_id, region):
+    ec2 = boto3.client('ec2', region_name=region)
+    ec2.create_transit_gateway_route(
+        TransitGatewayRouteTableId=rtb_id,
+        DestinationCidrBlock=destination_cidr,
+        TransitGatewayAttachmentId=attachment_id
+    )
+    print(f"[{region}] Ruta {destination_cidr} añadida a {rtb_id}")
+
 
 if __name__ == "__main__":
     # --- Crear VPCs ---
@@ -171,10 +256,10 @@ if __name__ == "__main__":
     sg2_west = crear_security_group(vpc2_west, REGION_WEST, 'sg_ore2')
 
     # --- Instancias EC2 ---
-    lanzar_ec2(sub1_east, sg1_east, REGION_EAST,'EC2_vir1')
-    lanzar_ec2(sub2_east, sg2_east, REGION_EAST,'EC2_vir2')
-    lanzar_ec2(sub1_west, sg1_west, REGION_WEST,'EC2_ore1')
-    lanzar_ec2(sub2_west, sg2_west, REGION_WEST,'EC2_ore2')
+    lanzar_ec2vir(sub1_east, sg1_east, REGION_EAST,'EC2_vir1')
+    lanzar_ec2vir(sub2_east, sg2_east, REGION_EAST,'EC2_vir2')
+    lanzar_ec2ore(sub1_west, sg1_west, REGION_WEST,'EC2_ore1')
+    lanzar_ec2ore(sub2_west, sg2_west, REGION_WEST,'EC2_ore2')
 
     # --- Transit Gateways ---
     tgw_east = crear_transit_gateway(REGION_EAST, 'TGW_East')
@@ -186,8 +271,35 @@ if __name__ == "__main__":
     crear_vpc_attachment(tgw_west, vpc1_west, sub1_west, REGION_WEST)
     crear_vpc_attachment(tgw_west, vpc2_west, sub2_west, REGION_WEST)
 
+
+    # --- Rutas misma regiones
+    crear_ruta_vpc_hacia_tgw(rtb1_east, '10.2.0.0/16', tgw_east, REGION_EAST)
+    crear_ruta_vpc_hacia_tgw(rtb2_east, '10.1.0.0/16', tgw_east, REGION_EAST)
+    crear_ruta_vpc_hacia_tgw(rtb1_west, '192.224.0.0/16', tgw_west, REGION_WEST)
+    crear_ruta_vpc_hacia_tgw(rtb2_west, '192.168.0.0/16', tgw_west, REGION_WEST)
+
     # --- Peer TGW ---
-    crear_peering(tgw_east, tgw_west)
+    peer_id = crear_peering(tgw_east, tgw_west)
 
     # --- Obtener TGW Route Table ---
-    obtener_tgw_route_table(tgw_east, REGION_EAST)
+
+    tgw_rtb_east = obtener_tgw_route_table(tgw_east, REGION_EAST)
+    tgw_rtb_west = obtener_tgw_route_table(tgw_west, REGION_WEST)
+
+    # --- Rutas TGW EAST -> WEST ---
+    crear_ruta_tgw(tgw_rtb_east, '192.168.0.0/16', peer_id, REGION_EAST)
+    crear_ruta_tgw(tgw_rtb_east, '192.224.0.0/16', peer_id, REGION_EAST)
+    crear_ruta_vpc_hacia_tgw(rtb1_east, '192.168.0.0/16', tgw_east, REGION_EAST)
+    crear_ruta_vpc_hacia_tgw(rtb1_east, '192.224.0.0/16', tgw_east, REGION_EAST)
+    crear_ruta_vpc_hacia_tgw(rtb2_east, '192.168.0.0/16', tgw_east, REGION_EAST)
+    crear_ruta_vpc_hacia_tgw(rtb2_east, '192.224.0.0/16', tgw_east, REGION_EAST)
+
+
+    # --- Rutas TGW WEST -> EAST ---
+    crear_ruta_tgw(tgw_rtb_west, '10.1.0.0/16', peer_id, REGION_WEST)
+    crear_ruta_tgw(tgw_rtb_west, '10.2.0.0/16', peer_id, REGION_WEST)
+    crear_ruta_vpc_hacia_tgw(rtb1_west, '10.1.0.0/16', tgw_west, REGION_WEST)
+    crear_ruta_vpc_hacia_tgw(rtb1_west, '10.2.0.0/16', tgw_west, REGION_WEST)
+    crear_ruta_vpc_hacia_tgw(rtb2_west, '10.1.0.0/16', tgw_west, REGION_WEST)
+    crear_ruta_vpc_hacia_tgw(rtb2_west, '10.2.0.0/16', tgw_west, REGION_WEST)
+
