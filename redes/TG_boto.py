@@ -35,6 +35,70 @@ def crear_subred_publica(vpc_id, region, cidr, nombre):
     print(f"[{region}] Subred pública '{nombre}' creada: {sub}")
     return sub
 
+def crear_subred_privada(vpc_id, region, cidr, nombre):
+    ec2 = boto3.client('ec2', region_name=region)
+    sub = ec2.create_subnet(
+        VpcId=vpc_id,
+        CidrBlock=cidr,
+        TagSpecifications=[{
+            'ResourceType': 'subnet',
+            'Tags': [{'Key': 'Name', 'Value': nombre}]
+        }]
+    )['Subnet']['SubnetId']
+
+    print(f"[{region}] Subred privada '{nombre}' creada: {sub}")
+    return sub
+def crear_nat_gateway(subnet_publica_id, region, nombre):
+    ec2 = boto3.client('ec2', region_name=region)
+
+    eip = ec2.allocate_address(Domain='vpc')
+    nat = ec2.create_nat_gateway(
+        SubnetId=subnet_publica_id,
+        AllocationId=eip['AllocationId'],
+        TagSpecifications=[{
+            'ResourceType': 'natgateway',
+            'Tags': [{'Key': 'Name', 'Value': nombre}]
+        }]
+    )['NatGateway']['NatGatewayId']
+
+    print(f"[{region}] NAT Gateway '{nombre}' creado: {nat}")
+
+    while True:
+        time.sleep(1)
+        state = ec2.describe_nat_gateways(
+            NatGatewayIds=[nat]
+        )['NatGateways'][0]['State']
+        if state == 'available':
+            break
+
+    print(f"[{region}] NAT Gateway '{nombre}' disponible")
+    return nat
+
+def crear_route_table_privada(vpc_id, region, nat_id, sub_privada_id, nombre):
+    ec2 = boto3.client('ec2', region_name=region)
+
+    rtb = ec2.create_route_table(
+        VpcId=vpc_id,
+        TagSpecifications=[{
+            'ResourceType': 'route-table',
+            'Tags': [{'Key': 'Name', 'Value': nombre}]
+        }]
+    )['RouteTable']['RouteTableId']
+
+    ec2.create_route(
+        RouteTableId=rtb,
+        DestinationCidrBlock='0.0.0.0/0',
+        NatGatewayId=nat_id
+    )
+
+    ec2.associate_route_table(
+        RouteTableId=rtb,
+        SubnetId=sub_privada_id
+    )
+
+    print(f"[{region}] Tabla privada '{nombre}' creada y asociada a {sub_privada_id}")
+    return rtb
+
 def crear_route_table_publica(vpc_id, region, igw_id, sub_id, nombre):
     ec2 = boto3.client('ec2', region_name=region)
     rtb = ec2.create_route_table(
@@ -80,6 +144,37 @@ def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-00f46ccd1cbfb363e")
         MinCount=1,
         MaxCount=1,
         NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':True}],
+        TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
+    )['Instances'][0]['InstanceId']
+    print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
+    waiter = ec2.get_waiter('instance_running')
+    waiter.wait(InstanceIds=[inst])
+    return inst
+
+def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-0360c520857e3138f"):
+    ec2 = boto3.client('ec2', region_name=region)
+    inst = ec2.run_instances(
+        ImageId=ami_id,
+        InstanceType="t3.micro",
+        KeyName="vockey",
+        MinCount=1,
+        MaxCount=1,
+        NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':False}],
+        TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
+    )['Instances'][0]['InstanceId']
+    print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
+    waiter = ec2.get_waiter('instance_running')
+    waiter.wait(InstanceIds=[inst])
+    return inst
+
+def lanzar_ec2_priv_ore(sub_id, sg_id, region, nombre, ami_id="ami-00f46ccd1cbfb363e"):
+    ec2 = boto3.client('ec2', region_name=region)
+    inst = ec2.run_instances(
+        ImageId=ami_id,
+        InstanceType="t3.micro",
+        MinCount=1,
+        MaxCount=1,
+        NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':False}],
         TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
     )['Instances'][0]['InstanceId']
     print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
@@ -237,11 +332,32 @@ if __name__ == "__main__":
     igw1_west = crear_igw_y_asociar(vpc1_west, REGION_WEST, 'ore-alex1')
     igw2_west = crear_igw_y_asociar(vpc2_west, REGION_WEST, 'ore-alex2')
 
-    # --- Subredes públicas ---
+    # --- Subredes públicas y privadas ---
     sub1_east = crear_subred_publica(vpc1_east, REGION_EAST, '10.1.0.0/24','sub1_vir')
     sub2_east = crear_subred_publica(vpc2_east, REGION_EAST, '10.2.0.0/24','sub2_vir')
     sub1_west = crear_subred_publica(vpc1_west, REGION_WEST, '192.168.0.0/24','sub1_ore')
     sub2_west = crear_subred_publica(vpc2_west, REGION_WEST, '192.224.0.0/24','sub2_ore')
+    sub1_priv_east = crear_subred_privada(vpc1_east, REGION_EAST, '10.1.1.0/24', 'sub1_vir_priv')
+    sub2_priv_east = crear_subred_privada(vpc2_east, REGION_EAST, '10.2.1.0/24', 'sub2_vir_priv')
+    sub1_priv_west = crear_subred_privada(vpc1_west, REGION_WEST, '192.168.1.0/24', 'sub1_ore_priv')
+    sub2_priv_west = crear_subred_privada(vpc2_west, REGION_WEST, '192.224.1.0/24', 'sub2_ore_priv')
+
+    # --- Nat Gateways ---
+    nat1_east = crear_nat_gateway(sub1_east, REGION_EAST, 'nat_vir1')
+    nat2_east = crear_nat_gateway(sub2_east, REGION_EAST, 'nat_vir2')
+    nat1_west = crear_nat_gateway(sub1_west, REGION_WEST, 'nat_ore1')
+    nat2_west = crear_nat_gateway(sub2_west, REGION_WEST, 'nat_ore2')
+
+    # --- Tablas de rutas Privadas ---
+
+    rtb_priv1_east = crear_route_table_privada(vpc1_east, REGION_EAST, nat1_east, sub1_priv_east, 'rtb_priv_vir1')
+
+    rtb_priv2_east = crear_route_table_privada(vpc2_east, REGION_EAST, nat2_east, sub2_priv_east, 'rtb_priv_vir2')
+
+    rtb_priv1_west = crear_route_table_privada(vpc1_west, REGION_WEST, nat1_west, sub1_priv_west, 'rtb_priv_ore1')
+
+    rtb_priv2_west = crear_route_table_privada(vpc2_west, REGION_WEST, nat2_west, sub2_priv_west, 'rtb_priv_ore2')
+   
 
     # --- Tablas de rutas públicas ---
     rtb1_east = crear_route_table_publica(vpc1_east, REGION_EAST, igw1_east, sub1_east,'rtb_pub1')
@@ -254,12 +370,20 @@ if __name__ == "__main__":
     sg2_east = crear_security_group(vpc2_east, REGION_EAST, 'sg_vir2')
     sg1_west = crear_security_group(vpc1_west, REGION_WEST, 'sg_ore1')
     sg2_west = crear_security_group(vpc2_west, REGION_WEST, 'sg_ore2')
+    sg1_eastpriv = crear_security_group(vpc1_east, REGION_EAST, 'sg_vir1')
+    sg2_eastpriv = crear_security_group(vpc2_east, REGION_EAST, 'sg_vir2')
+    sg1_westpriv = crear_security_group(vpc1_west, REGION_WEST, 'sg_ore1')
+    sg2_westpriv = crear_security_group(vpc2_west, REGION_WEST, 'sg_ore2')
 
     # --- Instancias EC2 ---
     lanzar_ec2vir(sub1_east, sg1_east, REGION_EAST,'EC2_vir1')
     lanzar_ec2vir(sub2_east, sg2_east, REGION_EAST,'EC2_vir2')
     lanzar_ec2ore(sub1_west, sg1_west, REGION_WEST,'EC2_ore1')
     lanzar_ec2ore(sub2_west, sg2_west, REGION_WEST,'EC2_ore2')
+    lanzar_ec2_priv_vir(sub1_priv_east, sg1_eastpriv, REGION_EAST,'EC2_vir1priv')
+    lanzar_ec2_priv_vir(sub2_priv_east, sg2_eastpriv, REGION_EAST,'EC2_vir2priv')
+    lanzar_ec2_priv_ore(sub1_priv_west, sg1_westpriv, REGION_WEST,'EC2_ore1priv')
+    lanzar_ec2_priv_ores(sub2_priv_west, sg2_westpriv, REGION_WEST,'EC2_ore2priv')
 
     # --- Transit Gateways ---
     tgw_east = crear_transit_gateway(REGION_EAST, 'TGW_East')
