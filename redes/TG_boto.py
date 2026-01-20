@@ -199,7 +199,7 @@ def crear_transit_gateway(region, nombre):
     # Esperar a que esté disponible
     state = ""
     while state != "available":
-        time.sleep(5)
+        time.sleep(1)
         state = ec2.describe_transit_gateways(TransitGatewayIds=[tgw_id])['TransitGateways'][0]['State']
     print(f"[{region}] TGW '{nombre}' disponible")
     return tgw_id
@@ -214,7 +214,7 @@ def crear_vpc_attachment(tgw_id, vpc_id, sub_id, region):
     # Esperar disponibilidad
     state = ""
     while state != "available":
-        time.sleep(5)
+        time.sleep(1)
         state = ec2.describe_transit_gateway_vpc_attachments(TransitGatewayAttachmentIds=[att_id])['TransitGatewayVpcAttachments'][0]['State']
     print(f"[{region}] VPC Attachment {att_id} disponible")
     return att_id
@@ -370,10 +370,10 @@ if __name__ == "__main__":
     sg2_east = crear_security_group(vpc2_east, REGION_EAST, 'sg_vir2')
     sg1_west = crear_security_group(vpc1_west, REGION_WEST, 'sg_ore1')
     sg2_west = crear_security_group(vpc2_west, REGION_WEST, 'sg_ore2')
-    sg1_eastpriv = crear_security_group(vpc1_east, REGION_EAST, 'sg_vir1')
-    sg2_eastpriv = crear_security_group(vpc2_east, REGION_EAST, 'sg_vir2')
-    sg1_westpriv = crear_security_group(vpc1_west, REGION_WEST, 'sg_ore1')
-    sg2_westpriv = crear_security_group(vpc2_west, REGION_WEST, 'sg_ore2')
+    sg1_eastpriv = crear_security_group(vpc1_east, REGION_EAST, 'sg_vir1priv')
+    sg2_eastpriv = crear_security_group(vpc2_east, REGION_EAST, 'sg_vir2priv')
+    sg1_westpriv = crear_security_group(vpc1_west, REGION_WEST, 'sg_ore1priv')
+    sg2_westpriv = crear_security_group(vpc2_west, REGION_WEST, 'sg_ore2priv')
 
     # --- Instancias EC2 ---
     lanzar_ec2vir(sub1_east, sg1_east, REGION_EAST,'EC2_vir1')
