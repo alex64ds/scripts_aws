@@ -5,6 +5,33 @@ from botocore.exceptions import ClientError
 REGION_EAST = "us-east-1"
 REGION_WEST = "us-west-2"
 
+ec2 = boto3.client(
+    "ec2",
+    region_name=REGION_WEST  
+)
+
+key_name = "key_ore"
+
+try:
+    # Comprobamos si el key pair ya existe
+    ec2.describe_key_pairs(KeyNames=[key_name])
+    print(f"El par de claves '{key_name}' ya existe en us-west-2.")
+
+except ClientError as e:
+    if e.response["Error"]["Code"] == "InvalidKeyPair.NotFound":
+        # No existe -> lo creamos
+        response = ec2.create_key_pair(KeyName=key_name)
+        private_key = response["KeyMaterial"]
+
+        with open(f"{key_name}.pem", "w") as f:
+            f.write(private_key)
+
+        print(f"Par de claves creado en us-west-2: {key_name}.pem")
+
+    else:
+        # Cualquier otro error sí lo lanzamos
+        raise
+
 def crear_vpc(region, cidr, nombre):
     ec2 = boto3.client('ec2', region_name=region)
     vpc = ec2.create_vpc(CidrBlock=cidr)
@@ -25,10 +52,11 @@ def crear_igw_y_asociar(vpc_id, region, nombre):
     print(f"[{region}] IGW '{nombre}' creado y asociado a VPC {vpc_id}")
     return igw
 
-def crear_subred_publica(vpc_id, region, cidr, nombre):
+def crear_subred_publica(vpc_id, region, cidr, nombre, az):
     ec2 = boto3.client('ec2', region_name=region)
     sub = ec2.create_subnet(
         VpcId=vpc_id,
+        AvailabilityZone=az,
         CidrBlock=cidr,
         TagSpecifications=[{'ResourceType':'subnet','Tags':[{'Key':'Name','Value':nombre}]}]
     )['Subnet']['SubnetId']
@@ -36,10 +64,11 @@ def crear_subred_publica(vpc_id, region, cidr, nombre):
     print(f"[{region}] Subred pública '{nombre}' creada: {sub}")
     return sub
 
-def crear_subred_privada(vpc_id, region, cidr, nombre):
+def crear_subred_privada(vpc_id, region, cidr, nombre, az):
     ec2 = boto3.client('ec2', region_name=region)
     sub = ec2.create_subnet(
         VpcId=vpc_id,
+        AvailabilityZone=az,
         CidrBlock=cidr,
         TagSpecifications=[{
             'ResourceType': 'subnet',
@@ -123,6 +152,7 @@ def crear_security_group(vpc_id, region, nombre):
 
 def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-0b6c6ebed2801a5cb"):
     ec2 = boto3.client('ec2', region_name=region)
+    
     inst = ec2.run_instances(
         ImageId=ami_id,
         InstanceType="t2.micro",
@@ -133,8 +163,8 @@ def lanzar_ec2vir(sub_id, sg_id, region, nombre, ami_id="ami-0b6c6ebed2801a5cb")
         TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
     )['Instances'][0]['InstanceId']
     print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
-    waiter = ec2.get_waiter('instance_running')
-    waiter.wait(InstanceIds=[inst])
+    # waiter = ec2.get_waiter('instance_running')
+    # waiter.wait(InstanceIds=[inst])
     return inst
 
 def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-0786adace1541ca80"):
@@ -142,14 +172,15 @@ def lanzar_ec2ore(sub_id, sg_id, region, nombre, ami_id="ami-0786adace1541ca80")
     inst = ec2.run_instances(
         ImageId=ami_id,
         InstanceType="t2.micro",
+        KeyName=key_name,
         MinCount=1,
         MaxCount=1,
         NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':True}],
         TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
     )['Instances'][0]['InstanceId']
     print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
-    waiter = ec2.get_waiter('instance_running')
-    waiter.wait(InstanceIds=[inst])
+    # waiter = ec2.get_waiter('instance_running')
+    # waiter.wait(InstanceIds=[inst])
     return inst
 
 def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-0b6c6ebed2801a5cb"):
@@ -164,8 +195,8 @@ def lanzar_ec2_priv_vir(sub_id, sg_id, region, nombre, ami_id="ami-0b6c6ebed2801
         TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
     )['Instances'][0]['InstanceId']
     print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
-    waiter = ec2.get_waiter('instance_running')
-    waiter.wait(InstanceIds=[inst])
+    # waiter = ec2.get_waiter('instance_running')
+    # waiter.wait(InstanceIds=[inst])
     return inst
 
 def lanzar_ec2_priv_ore(sub_id, sg_id, region, nombre, ami_id="ami-0786adace1541ca80"):
@@ -173,14 +204,15 @@ def lanzar_ec2_priv_ore(sub_id, sg_id, region, nombre, ami_id="ami-0786adace1541
     inst = ec2.run_instances(
         ImageId=ami_id,
         InstanceType="t2.micro",
+        KeyName=key_name,
         MinCount=1,
         MaxCount=1,
         NetworkInterfaces=[{'DeviceIndex':0,'SubnetId':sub_id,'Groups':[sg_id],'AssociatePublicIpAddress':False}],
         TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':nombre}]}]
     )['Instances'][0]['InstanceId']
     print(f"[{region}] EC2 '{nombre}' lanzada: {inst}")
-    waiter = ec2.get_waiter('instance_running')
-    waiter.wait(InstanceIds=[inst])
+    # waiter = ec2.get_waiter('instance_running')
+    # waiter.wait(InstanceIds=[inst])
     return inst
 
 def crear_transit_gateway(region, nombre):
@@ -251,7 +283,7 @@ def crear_peering(tgw_id_east, tgw_id_west):
             TransitGatewayAttachmentIds=[peer_id]
         )['TransitGatewayPeeringAttachments'][0]['State']
 
-        print(f"EAST → {state}")
+        print(f"EAST -> {state}")
         if state == "pendingAcceptance":
             break
 
@@ -330,14 +362,14 @@ if __name__ == "__main__":
     igw2_west = crear_igw_y_asociar(vpc2_west, REGION_WEST, 'ore-alex2')
 
     # --- Subredes públicas y privadas ---
-    sub1_east = crear_subred_publica(vpc1_east, REGION_EAST, '10.1.0.0/24','sub1_vir')
-    sub2_east = crear_subred_publica(vpc2_east, REGION_EAST, '10.2.0.0/24','sub2_vir')
-    sub1_west = crear_subred_publica(vpc1_west, REGION_WEST, '192.168.0.0/24','sub1_ore')
-    sub2_west = crear_subred_publica(vpc2_west, REGION_WEST, '192.224.0.0/24','sub2_ore')
-    sub1_priv_east = crear_subred_privada(vpc1_east, REGION_EAST, '10.1.1.0/24', 'sub1_vir_priv')
-    sub2_priv_east = crear_subred_privada(vpc2_east, REGION_EAST, '10.2.1.0/24', 'sub2_vir_priv')
-    sub1_priv_west = crear_subred_privada(vpc1_west, REGION_WEST, '192.168.1.0/24', 'sub1_ore_priv')
-    sub2_priv_west = crear_subred_privada(vpc2_west, REGION_WEST, '192.224.1.0/24', 'sub2_ore_priv')
+    sub1_east = crear_subred_publica(vpc1_east, REGION_EAST, '10.1.0.0/24','sub1_vir', 'us-east-1a')
+    sub2_east = crear_subred_publica(vpc2_east, REGION_EAST, '10.2.0.0/24','sub2_vir','us-east-1b')
+    sub1_west = crear_subred_publica(vpc1_west, REGION_WEST, '192.168.0.0/24','sub1_ore', 'us-west-2a')
+    sub2_west = crear_subred_publica(vpc2_west, REGION_WEST, '192.224.0.0/24','sub2_ore', 'us-west-2b')
+    sub1_priv_east = crear_subred_privada(vpc1_east, REGION_EAST, '10.1.1.0/24', 'sub1_vir_priv','us-east-1c')
+    sub2_priv_east = crear_subred_privada(vpc2_east, REGION_EAST, '10.2.1.0/24', 'sub2_vir_priv','us-east-1a')
+    sub1_priv_west = crear_subred_privada(vpc1_west, REGION_WEST, '192.168.1.0/24', 'sub1_ore_priv', 'us-west-2c')
+    sub2_priv_west = crear_subred_privada(vpc2_west, REGION_WEST, '192.224.1.0/24', 'sub2_ore_priv', 'us-west-2a')
    
 
     # --- Tablas de rutas públicas ---
